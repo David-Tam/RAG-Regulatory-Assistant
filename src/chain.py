@@ -7,9 +7,14 @@ load_dotenv()
 
 PROMPT_TEMPLATE = """
 You are a regulatory compliance assistant for a Canadian bank.
-Answer the question using ONLY the context provided below.
-If the answer is not in the context, say "I cannot find this in the provided documents."
+Use the context below to answer the question as fully as possible.
+Only say "I cannot find this in the provided documents" if there is truly no relevant information at all.
 Always mention which document your answer comes from.
+
+Document aliases:
+- "B-20" refers to the document "Residential mortgage underwriting practices and procedures"
+- "E-23" refers to the document "Guideline E-23 Model Risk Management"
+- "IFRS 9" refers to the document "ifrs-9-financial-instruments"
 
 Context:
 {context}
@@ -27,10 +32,15 @@ def ask(question):
     )
     retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
     docs = retriever.invoke(question)
+    seen = set()
+    unique_docs = []
+    for doc in docs:
+        key = (doc.metadata.get('source'), doc.metadata.get('page'))
+        if key not in seen:
+            seen.add(key)
+            unique_docs.append(doc)
+    docs = unique_docs
     context = "\n\n".join(doc.page_content for doc in docs)
-    print("--- CONTEXT ---")
-    print(context[:2000])
-    print("--- END ---\n")
 
     prompt = PromptTemplate(
         template=PROMPT_TEMPLATE,
@@ -48,4 +58,15 @@ def ask(question):
         print(f"- {doc.metadata.get('source')} (page {doc.metadata.get('page')})")
 
 if __name__ == "__main__":
-    ask("What does IFRS 9 require for 12-month expected credit losses?")
+    print("Regulatory Document Assistant")
+    print("Documents: OSFI E-23, OSFI B-20, IFRS 9")
+    print("Type 'quit' to exit\n")
+
+    while True:
+        question = input("Your question: ").strip()
+        if question.lower() == "quit":
+            break
+        if not question:
+            continue
+        ask(question)
+        print("\n" + "="*60 + "\n")
